@@ -72,15 +72,64 @@ process = Framework.create(False, eras.Run2_25ns, '74X_mcRun2_asymptotic_v2', cm
     )
 
 #jetToolbox( process, 'ak8', 'jetSequence', 'out', PUMethod='CHS', miniAOD=True, addPruning=True, addSoftDrop=True, addSoftDropSubjets=True, addNsub=True, addTrimming=True, Cut='')
-jetToolbox( process, 'ak8', 'ak8JetSubs', 'out', PUMethod='CHS', miniAOD=True, addPruning=True, addSoftDrop=True, addSoftDropSubjets=True, addNsub=True, addTrimming=True, Cut='')
+jetToolbox( process, 'ak8', 'ak8JetSubs', 'out', PUMethod='CHS', miniAOD=True, addPruning=True, addSoftDrop=True, addSoftDropSubjets=True, addNsub=True, Cut='')
 #jetToolbox( process, 'ak8', 'ak8JetSubs', 'out', addSoftDrop=True, addSoftDropSubjets=True, addNsub=True, addTrimming=True ) 
 
 #process.options.allowUnscheduled = cms.untracked.bool(True) # Why?
-process.framework.producers.fat_jets.parameters.jets = cms.untracked.InputTag('selectedPatJetsAK8PFCHS')
-process.framework.producers.fat_jets.parameters.SoftDropSubjets = cms.untracked.string('selectedPatJetsAK8PFCHSSoftDropSubjets')
+#process.framework.producers.fat_jets.parameters.jets = cms.untracked.InputTag('selectedPatJetsAK8PFCHS')
+
+from PhysicsTools.PatAlgos.tools.jetTools import addJetCollection
+## PATify pruned fat jets
+addJetCollection(
+    process,
+    labelName = 'AK8PFCHSSoftDrop',
+    jetSource = cms.InputTag('ak8PFJetsCHSSoftDrop'),
+    btagDiscriminators = ['None'],
+    jetCorrections = ('AK8PFchs', ['L1FastJet', 'L2Relative', 'L3Absolute'], 'None'),
+    getJetMCFlavour = False # jet flavor disabled
+)
+    
+## PATify soft drop subjets
+addJetCollection(
+    process,
+    labelName = 'AK8PFCHSSoftDropSubjets',
+    jetSource = cms.InputTag('ak8PFJetsCHSSoftDrop','SubJets'),
+    algo = 'ak',  # needed for subjet flavor clustering
+    rParam = 0.8, # needed for subjet flavor clustering
+    btagDiscriminators = ['pfCombinedSecondaryVertexV2BJetTags', 'pfCombinedInclusiveSecondaryVertexV2BJetTags'],
+    jetCorrections = ('AK4PFchs', ['L1FastJet', 'L2Relative', 'L3Absolute'], 'None'),
+    explicitJTA = True,  # needed for subjet b tagging
+    svClustering = True, # needed for subjet b tagging
+    genJetCollection = cms.InputTag('slimmedGenJets'), 
+    fatJets=cms.InputTag('ak8PFJetsCHS'),             # needed for subjet flavor clustering
+    groomedFatJets=cms.InputTag('ak8PFJetsCHSSoftDrop') # needed for subjet flavor clustering
+)
+
+process.slimmedJetsAK8PFCHSSoftDropSubjets = cms.EDProducer("PATJetSlimmer",
+    src = cms.InputTag("selectedPatJetsAK8PFCHSSoftDropSubjets"),
+    packedPFCandidates = cms.InputTag("packedPFCandidates"),
+    dropJetVars = cms.string("1"),
+    dropDaughters = cms.string("0"),
+    rekeyDaughters = cms.string("1"),
+    dropTrackRefs = cms.string("1"),
+    dropSpecific = cms.string("1"),
+    dropTagInfos = cms.string("1"),
+    modifyJets = cms.bool(True),
+    modifierConfig = cms.PSet( modifications = cms.VPSet() )
+)
+    
+## Establish references between PATified fat jets and subjets using the BoostedJetMerger
+process.slimmedJetsAK8PFCHSSoftDropPacked = cms.EDProducer("BoostedJetMerger",
+    jetSrc=cms.InputTag("selectedPatJetsAK8PFCHSSoftDrop"),
+    subjetSrc=cms.InputTag("slimmedJetsAK8PFCHSSoftDropSubjets")
+)
+
+process.framework.producers.fat_jets.parameters.jets = cms.untracked.InputTag('slimmedJetsAK8PFCHSSoftDropPacked')
+process.framework.producers.fat_jets.parameters.SoftDropSubjets = cms.untracked.string('selectedPatJetsAK8PFCHSoftDropSubjets')
 process.framework.producers.fat_jets.parameters.Njettinesstau1 = cms.untracked.string('NjettinessAK8CHS:tau1')
 process.framework.producers.fat_jets.parameters.Njettinesstau2 = cms.untracked.string('NjettinessAK8CHS:tau2')
 process.framework.producers.fat_jets.parameters.Njettinesstau3 = cms.untracked.string('NjettinessAK8CHS:tau3')
+
 process.framework.producers.fat_jets.parameters.cut = cms.untracked.string("pt > 20")
 
 Framework.schedule(process, analyzers=['dilepton', 'bTagsLoose', 'bTagsMedium', 'bTagsTight', 'test'],
