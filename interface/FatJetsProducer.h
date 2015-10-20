@@ -36,6 +36,7 @@ class FatJetsProducer: public CandidatesProducer<pat::Jet>, public BTaggingScale
             Njettinesstau1 = config.getUntrackedParameter<std::string>("Njettinesstau1","NjettinessAK8:tau1");
             Njettinesstau2 = config.getUntrackedParameter<std::string>("Njettinesstau2","NjettinessAK8:tau2");
             Njettinesstau3 = config.getUntrackedParameter<std::string>("Njettinesstau3","NjettinessAK8:tau3");
+            SoftDropSubjets = config.getUntrackedParameter<std::string>("SoftDropSubjets","SoftDrop");
 
         }
 
@@ -65,7 +66,7 @@ class FatJetsProducer: public CandidatesProducer<pat::Jet>, public BTaggingScale
         std::string Njettinesstau1;
         std::string Njettinesstau2;
         std::string Njettinesstau3;
-
+        std::string SoftDropSubjets;
 
     public:
         // Tree members
