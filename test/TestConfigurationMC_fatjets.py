@@ -79,6 +79,8 @@ jetToolbox( process, 'ak8', 'ak8JetSubs', 'out', PUMethod='CHS', miniAOD=True, a
 #process.framework.producers.fat_jets.parameters.jets = cms.untracked.InputTag('selectedPatJetsAK8PFCHS')
 
 from PhysicsTools.PatAlgos.tools.jetTools import addJetCollection
+
+
 ## PATify pruned fat jets
 addJetCollection(
     process,
@@ -105,6 +107,49 @@ addJetCollection(
     groomedFatJets=cms.InputTag('ak8PFJetsCHSSoftDrop') # needed for subjet flavor clustering
 )
 
+# change the genParticle collection to prunedGenParticles
+process.patJetPartonMatchAK8PFCHSSoftDrop.matched = cms.InputTag("prunedGenParticles")
+process.patJetPartonMatchAK8PFCHSSoftDropSubjets.matched = cms.InputTag("prunedGenParticles")
+process.patJetPartons.particles = cms.InputTag("prunedGenParticles")
+process.patJetPartonsLegacy.src = cms.InputTag("prunedGenParticles")
+
+# cone info for SoftDrop (why?)
+process.patJetGenJetMatchAK8PFCHSSoftDrop.matched = cms.InputTag("ak8GenJetsNoNu")
+process.patJetGenJetMatchAK8PFCHSSoftDrop.maxDeltaR = cms.double(0.8)
+
+# change the offlinePrimaryVertices to slimmedOfflinePriamtryVertices
+process.pfImpactParameterTagInfos.primaryVertex = cms.InputTag("offlineSlimmedPrimaryVertices")
+process.pfImpactParameterTagInfosAK8.primaryVertex = cms.InputTag("offlineSlimmedPrimaryVertices")
+process.pfImpactParameterTagInfosAK8PFCHSSoftDropSubjets.primaryVertex = cms.InputTag("offlineSlimmedPrimaryVertices")
+process.pfImpactParameterTagInfosCA15.primaryVertex = cms.InputTag("offlineSlimmedPrimaryVertices")
+
+process.pileupJetIdCalculator.vertexes = cms.InputTag("offlineSlimmedPrimaryVertices")
+process.pileupJetIdEvaluator.vertexes = cms.InputTag("offlineSlimmedPrimaryVertices")
+
+process.softMuonTagInfos.primaryVertex = cms.InputTag("offlineSlimmedPrimaryVertices")
+process.softPFMuonsTagInfosAK8.primaryVertex = cms.InputTag("offlineSlimmedPrimaryVertices")
+process.softPFMuonsTagInfosCA15.primaryVertex = cms.InputTag("offlineSlimmedPrimaryVertices")
+
+process.softPFElectronsTagInfos.primaryVertex = cms.InputTag("offlineSlimmedPrimaryVertices")
+process.softPFElectronsTagInfosAK8.primaryVertex = cms.InputTag("offlineSlimmedPrimaryVertices")
+process.softPFElectronsTagInfosCA15.primaryVertex = cms.InputTag("offlineSlimmedPrimaryVertices")
+
+process.impactParameterTagInfos.primaryVertex = cms.InputTag("offlineSlimmedPrimaryVertices")
+process.bVertexFilter.primaryVertex = cms.InputTag("offlineSlimmedPrimaryVertices")
+
+process.ak4CaloL1OffsetCorrector.vertexCollection = cms.InputTag("offlineSlimmedPrimaryVertices")
+process.ak4JPTL1OffsetCorrector.vertexCollection = cms.InputTag("offlineSlimmedPrimaryVertices")
+process.ak4PFCHSL1OffsetCorrector.vertexCollection = cms.InputTag("offlineSlimmedPrimaryVertices")
+process.ak4PFL1OffsetCorrector.vertexCollection = cms.InputTag("offlineSlimmedPrimaryVertices")
+
+process.patJetCorrFactorsAK8PFCHSSoftDrop.primaryVertices = cms.InputTag("offlineSlimmedPrimaryVertices")
+process.patJetCorrFactorsAK8PFCHSSoftDropSubjets.primaryVertices = cms.InputTag("offlineSlimmedPrimaryVertices")
+
+process.bToCharmDecayVertexMerged.primaryVertices = cms.InputTag("offlineSlimmedPrimaryVertices")
+process.bToCharmDecayVertexMerged.vertexCollection = cms.InputTag("offlineSlimmedPrimaryVertices")
+
+
+## creates slimmedJet 
 process.slimmedJetsAK8PFCHSSoftDropSubjets = cms.EDProducer("PATJetSlimmer",
     src = cms.InputTag("selectedPatJetsAK8PFCHSSoftDropSubjets"),
     packedPFCandidates = cms.InputTag("packedPFCandidates"),
@@ -122,6 +167,41 @@ process.slimmedJetsAK8PFCHSSoftDropSubjets = cms.EDProducer("PATJetSlimmer",
 process.slimmedJetsAK8PFCHSSoftDropPacked = cms.EDProducer("BoostedJetMerger",
     jetSrc=cms.InputTag("selectedPatJetsAK8PFCHSSoftDrop"),
     subjetSrc=cms.InputTag("slimmedJetsAK8PFCHSSoftDropSubjets")
+)
+
+process.packedPatJetsAK8 = cms.EDProducer("JetSubstructurePacker",
+    jetSrc = cms.InputTag("selectedPatJetsAK8"),
+    distMax = cms.double(0.8),
+    algoTags = cms.VInputTag(
+        # NOTE: For an optimal storage of the AK8 jet daughters, the first subjet collection listed here should be
+        #       derived from AK8 jets, i.e., subjets should contain either all or a subset of AK8 constituents.
+        #       The CMSTopTag subjets are derived from CA8 jets later matched to AK8 jets and could in principle
+        #       contain extra constituents not clustered inside AK8 jets.
+        cms.InputTag("slimmedJetsAK8PFCHSSoftDropPacked"),
+        cms.InputTag("slimmedJetsCMSTopTagCHSPacked")
+     ),
+     algoLabels = cms.vstring(
+         'SoftDrop',
+         'CMSTopTag'
+         ),
+     fixDaughters = cms.bool(True),
+     packedPFCandidates = cms.InputTag("packedPFCandidates"),
+)
+
+# switch off daughter re-keying since it's done in the JetSubstructurePacker (and can't be done afterwards)
+#process.slimmedJetsAK8.rekeyDaughters = "0"
+
+slimmedJetsAK8 = cms.EDProducer("PATJetSlimmer",
+   src = cms.InputTag("packedPatJetsAK8"),
+   packedPFCandidates = cms.InputTag("packedPFCandidates"),
+   dropJetVars = cms.string("1"),
+   dropDaughters = cms.string("0"),
+   rekeyDaughters = cms.string("1"),
+   dropTrackRefs = cms.string("1"),
+   dropSpecific = cms.string("0"),
+   dropTagInfos = cms.string("0"),
+   modifyJets = cms.bool(True),
+   modifierConfig = cms.PSet( modifications = cms.VPSet() )
 )
 
 process.framework.producers.fat_jets.parameters.jets = cms.untracked.InputTag('slimmedJetsAK8PFCHSSoftDropPacked')
